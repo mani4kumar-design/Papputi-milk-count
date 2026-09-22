@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Papputti Milk Count</title>
+<style>
+:root{--deep:#4b2466;--mid:#764596;--light:#f2e9fb;--paper:#fffdf9;--ink:#281a31;--pink:#d0769c;--line:#d7bce6}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:"Times New Roman",Times,serif;color:var(--ink);background-color:#6d3e89;background-image:radial-gradient(circle at 18px 18px,rgba(255,255,255,.18) 0 2px,transparent 3px),radial-gradient(circle at 51px 46px,rgba(40,15,58,.26) 0 3px,transparent 4px),linear-gradient(145deg,#4c2868,#8e5dad 52%,#5a3276);background-size:70px 70px,85px 85px,100% 100%}.wrap{max-width:670px;margin:auto;padding:22px 14px 44px}.top{text-align:center;color:white;text-shadow:0 2px 2px rgba(27,7,41,.35)}h1{font-size:clamp(31px,8vw,43px);margin:0}.top p{font-size:17px;margin:7px 0 18px}.card{background:var(--paper);border:3px solid #f4dbb9;border-radius:19px;padding:16px;margin:14px 0;box-shadow:0 9px 0 rgba(47,18,61,.28),0 15px 29px rgba(37,13,51,.26)}.row{display:flex;gap:11px;flex-wrap:wrap;align-items:end}.field{flex:1 1 145px}label{display:block;font-weight:bold;font-size:16px;color:var(--deep);margin-bottom:5px}input{width:100%;padding:11px;border:2px solid #cba6dc;border-radius:8px;font:17px "Times New Roman",Times,serif;background:#fff}button{border:0;border-radius:9px;padding:12px 16px;font:bold 17px "Times New Roman",Times,serif;cursor:pointer}.add{background:linear-gradient(#925ab4,#593172);color:white;box-shadow:inset 0 1px rgba(255,255,255,.35)}.add:active{transform:translateY(1px)}.message{margin:13px 0 0;color:#54296b;font-weight:bold;font-size:16px}.cards{display:flex;gap:10px;flex-wrap:wrap}.metric{flex:1 1 145px;padding:13px;background:#f6ebfb;border:2px solid var(--line);border-radius:12px}.metric span{display:block;color:#674576;font-size:14px}.metric strong{font-size:26px}.head{display:flex;justify-content:space-between;gap:8px;align-items:center}.head h2{font-size:20px;margin:0}.small{padding:8px 10px;font-size:14px;background:#ead8f8;color:#54296b;border:1px solid #c7a8da}.danger{background:#fde1e5;color:#8b1733;border:1px solid #edafbd}.feed{padding:12px 0;border-top:1px solid #eaded5;display:flex;align-items:center;gap:8px}.feed:first-child{border-top:0}.feed div{flex:1}.feed b{font-size:17px}.feed span{display:block;color:#6c536b;font-size:14px;margin-top:2px}.empty{text-align:center;color:#6c536b;padding:22px 5px;font-size:16px}.hint{font-size:15px;line-height:1.35;background:#fff0d5;border-color:#e7bd78;color:#714814}@media(max-width:430px){.cards{display:block}.metric{margin-bottom:8px}.feed{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <header class="top"><h1>🍪 Papputti Milk Count 🍪</h1><p>Milk feed tracker • 3:00 AM day cutoff</p></header>
+ <section class="card hint"><b>How to add:</b> enter the milk amount, select the time, then tap <b>Add Feed</b>. A confirmation message will appear immediately below.</section>
+ <section class="card">
+  <div class="row">
+   <div class="field"><label for="ml">Milk amount (mL)</label><input id="ml" type="number" min="1" inputmode="numeric" placeholder="Example: 100"></div>
+   <div class="field"><label for="time">Feed time</label><input id="time" type="time"></div>
+   <button class="add" type="button" onclick="addFeed()">+ Add Feed</button>
+  </div>
+  <p class="message" id="message">Ready to add Papputti’s next milk feed.</p>
+ </section>
+ <section class="card"><div class="cards"><div class="metric"><span>Feeds this cycle</span><strong id="count">0</strong></div><div class="metric"><span>Total milk</span><strong id="total">0 mL</strong></div><div class="metric"><span>Last feed</span><strong id="last">—</strong></div></div></section>
+ <section class="card"><div class="head"><h2 id="title">Feed log</h2><button class="small" type="button" onclick="downloadCSV()">Export CSV</button></div><div id="list"></div><p style="text-align:right;margin:10px 0 0"><button class="small danger" type="button" onclick="clearCycle()">Clear this cycle</button></p></section>
+</div>
+<script>
+var KEY='papputti-feed-fixed-v1';
+var feeds=[];
+function el(x){return document.getElementById(x)}
+function pad(n){return n<10?'0'+n:String(n)}
+function dateKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function cycleKey(d){var x=new Date(d.getTime());if(x.getHours()<3)x.setDate(x.getDate()-1);return dateKey(x)}
+function currentCycle(){return cycleKey(new Date())}
+function showTime(d){var h=d.getHours(),m=pad(d.getMinutes()),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+m+' '+ap}
+function makeId(){return String(Date.now())+'-'+String(Math.random()).substring(2)}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(feeds));return true}catch(e){return false}}
+function load(){try{var x=localStorage.getItem(KEY);feeds=x?JSON.parse(x):[]}catch(e){feeds=[]}}
+function escapeText(x){var n=document.createElement('span');n.textContent=x;return n.innerHTML}
+function nameDay(k){var a=k.split('-'),d=new Date(Number(a[0]),Number(a[1])-1,Number(a[2]));return d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}
+function addFeed(){
+ var amount=el('ml').value, time=el('time').value;
+ if(!amount || Number(amount)<=0){el('message').textContent='Please enter a milk amount, for example 100 mL.';el('ml').focus();return}
+ if(!time){el('message').textContent='Please select the feed time.';el('time').focus();return}
+ var now=new Date(),bits=time.split(':');
+ var feedDate=new Date(now.getFullYear(),now.getMonth(),now.getDate(),Number(bits[0]),Number(bits[1]),0,0);
+ feeds.push({id:makeId(),amount:Number(amount),when:feedDate.getTime()});
+ var stored=save();el('ml').value='';el('time').value=pad(new Date().getHours())+':'+pad(new Date().getMinutes());
+ el('message').textContent='✓ Added '+amount+' mL at '+showTime(feedDate)+(stored?' and saved it on this device.':' for this open session.');
+ render();
+}
+function render(){
+ var c=currentCycle(),a=[],i,total=0;for(i=0;i<feeds.length;i++){var d=new Date(feeds[i].when);if(cycleKey(d)===c){a.push(feeds[i]);total+=Number(feeds[i].amount)}}a.sort(function(x,y){return y.when-x.when});el('title').textContent='Papputti’s log — '+nameDay(c);el('count').textContent=a.length;el('total').textContent=total+' mL';el('last').textContent=a.length?showTime(new Date(a[0].when)):'—';var html='';if(!a.length)html='<p class="empty">No milk feeds logged in this cycle yet.</p>';for(i=0;i<a.length;i++){var d2=new Date(a[i].when),note=d2.getHours()<3?' · counted with previous day':'';html+='<div class="feed"><div><b>'+escapeText(a[i].amount)+' mL milk</b><span>'+showTime(d2)+note+'</span></div><button class="small danger" type="button" onclick="removeFeed(\''+a[i].id+'\')">Delete</button></div>'}el('list').innerHTML=html}
+function removeFeed(id){var out=[],i;for(i=0;i<feeds.length;i++)if(feeds[i].id!==id)out.push(feeds[i]);feeds=out;save();el('message').textContent='Feed deleted.';render()}
+function clearCycle(){if(!confirm('Clear all feeds in the current 3 AM cycle?'))return;var c=currentCycle(),out=[],i;for(i=0;i<feeds.length;i++)if(cycleKey(new Date(feeds[i].when))!==c)out.push(feeds[i]);feeds=out;save();el('message').textContent='This cycle was cleared.';render()}
+function downloadCSV(){var s=['Cycle date,Feed date,Time,Amount (mL)'],i;for(i=0;i<feeds.length;i++){var d=new Date(feeds[i].when);s.push(cycleKey(d)+','+dateKey(d)+','+showTime(d)+','+feeds[i].amount)}var b=new Blob([s.join('\n')],{type:'text/csv;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='papputti-milk-count.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u)},1000)}
+load();var n=new Date();el('time').value=pad(n.getHours())+':'+pad(n.getMinutes());render();
+</script>
+</body>
+</html>
